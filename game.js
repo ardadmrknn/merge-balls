@@ -136,6 +136,7 @@
 
     // Web Audio API
     let audioCtx = null;
+    let bgMusic = null;
 
     // ---- DOM Elementleri ----
     const scoreValueEl = document.getElementById('score-value');
@@ -150,11 +151,18 @@
     const evoCanvas = document.getElementById('evo-canvas');
     const evoCtx = evoCanvas ? evoCanvas.getContext('2d') : null;
 
-    // ---- Ses Sistemi (Prosedürel Web Audio) ----
+    // ---- Ses Sistemi (Prosedürel Web Audio + Arkaplan Müziği) ----
     function initAudio() {
         if (audioCtx) return;
         try {
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            
+            // Arka plan müziğini (dark.mp3) başlat
+            bgMusic = new Audio('dark.mp3');
+            bgMusic.loop = true;
+            bgMusic.volume = 0.4; // Müziğin de çok patlamaması için %40 seviyesine aldık
+            bgMusic.play().catch(e => console.log('Müzik otomatik başlatılamadı:', e));
+
         } catch (e) {
             audioCtx = null;
         }
@@ -168,7 +176,7 @@
         gain.connect(audioCtx.destination);
         osc.frequency.setValueAtTime(300, audioCtx.currentTime);
         osc.frequency.exponentialRampToValueAtTime(150, audioCtx.currentTime + 0.12);
-        gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.02, audioCtx.currentTime); // 0.08'den düşürüldü
         gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
         osc.type = 'sine';
         osc.start(audioCtx.currentTime);
@@ -185,7 +193,7 @@
         gain1.connect(audioCtx.destination);
         osc1.frequency.setValueAtTime(baseFreq, audioCtx.currentTime);
         osc1.frequency.exponentialRampToValueAtTime(baseFreq * 1.5, audioCtx.currentTime + 0.15);
-        gain1.gain.setValueAtTime(0.12, audioCtx.currentTime);
+        gain1.gain.setValueAtTime(0.05, audioCtx.currentTime); // 0.12'den düşürüldü
         gain1.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
         osc1.type = 'sine';
         osc1.start(audioCtx.currentTime);
@@ -197,7 +205,7 @@
         osc2.connect(gain2);
         gain2.connect(audioCtx.destination);
         osc2.frequency.setValueAtTime(baseFreq * 2, audioCtx.currentTime + 0.05);
-        gain2.gain.setValueAtTime(0.05, audioCtx.currentTime + 0.05);
+        gain2.gain.setValueAtTime(0.02, audioCtx.currentTime + 0.05);  // 0.05'ten düşürüldü
         gain2.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
         osc2.type = 'triangle';
         osc2.start(audioCtx.currentTime + 0.05);
@@ -213,7 +221,7 @@
         gain.connect(audioCtx.destination);
         osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
         osc.frequency.exponentialRampToValueAtTime(freq * 1.8, audioCtx.currentTime + 0.1);
-        gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.03, audioCtx.currentTime); // 0.08'den düşürüldü
         gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
         osc.type = 'square';
         osc.start(audioCtx.currentTime);
@@ -228,7 +236,7 @@
         gain.connect(audioCtx.destination);
         osc.frequency.setValueAtTime(400, audioCtx.currentTime);
         osc.frequency.exponentialRampToValueAtTime(80, audioCtx.currentTime + 0.6);
-        gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.05, audioCtx.currentTime); // 0.15'ten düşürüldü
         gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.7);
         osc.type = 'sawtooth';
         osc.start(audioCtx.currentTime);
@@ -1155,37 +1163,34 @@
         if (gameOver) return;
 
         const bodies = Composite.allBodies(engine.world);
-        const now = Date.now();
 
         for (let i = 0; i < bodies.length; i++) {
             const body = bodies[i];
             if (!body.label.startsWith('level')) continue;
 
-            // Yeni spawn'lanmış toplara tolerans (daha yüksekten düştükleri için 2500ms yapıldı)
-            if (now - body.spawnTime < 2500) continue;
-
             const x = body.position.x;
             const y = body.position.y;
             const r = body.scaledRadius;
 
-            // Topun merkezi sepet üst kenarının çok üstünde mi? (Game over sınırı sepetten taşma anıdır)
-            if (y - r < basketTopY - r * 1.5) {
+            // KURAL 1: Top ekranın en altından tamamen düştüyse
+            if (y > canvasHeight + r) {
                 triggerGameOver();
                 return;
             }
 
-            // Top sepet dışına mı çıktı (yanlara)?
-            const bounds = getBasketXAtY(y);
-            if (x - r < bounds.left - r * 0.5 || x + r > bounds.right + r * 0.5) {
-                triggerGameOver();
-                return;
+            // KURAL 2: Top sepet üst seviyesinin (basketTopY) daha aşağısına inmişse
+            // VE sepet sınırlarının dışındaysa (sepetin yanlarından düşüyorsa)
+            if (y > basketTopY) {
+                const bounds = getBasketXAtY(y);
+                // Topun merkezi, sepet duvarlarının dışındaysa
+                if (x < bounds.left - r * 0.5 || x > bounds.right + r * 0.5) {
+                    triggerGameOver();
+                    return;
+                }
             }
-
-            // Top ekranın altından mı düştü?
-            if (y > canvasHeight + 50) {
-                triggerGameOver();
-                return;
-            }
+            
+            // Eğer y <= basketTopY ise, toplar havada süzülüyordur veya tepeye yığılmıştır.
+            // Bu durumda oyunu BİTİRMİYORUZ, ta ki sağdan/soldan dökülüp düşene kadar.
         }
     }
 
