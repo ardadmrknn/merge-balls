@@ -2,7 +2,6 @@
 
 A physics-based, mobile-first Suika-style merge game built purely with Vanilla JavaScript, HTML5 Canvas, and Matter.js. 
 
-![Merge Guys Gameplay](https://via.placeholder.com/800x400.png?text=Merge+Guys+Gameplay) *(Bu alanı oyunun bir ekran görüntüsü ile değiştirebilirsiniz)*
 
 ## 🎮 Özellikler (Features)
 
