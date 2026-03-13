@@ -137,6 +137,7 @@
     // Web Audio API
     let audioCtx = null;
     let bgMusic = null;
+    let isMuted = false;
 
     // ---- DOM Elementleri ----
     const scoreValueEl = document.getElementById('score-value');
@@ -150,6 +151,9 @@
     const startBtn = document.getElementById('start-btn');
     const evoCanvas = document.getElementById('evo-canvas');
     const evoCtx = evoCanvas ? evoCanvas.getContext('2d') : null;
+    const muteBtn = document.getElementById('mute-btn');
+    const iconSoundOn = document.getElementById('icon-sound-on');
+    const iconSoundOff = document.getElementById('icon-sound-off');
 
     // ---- Ses Sistemi (Prosedürel Web Audio + Arkaplan Müziği) ----
     function initAudio() {
@@ -161,6 +165,7 @@
             bgMusic = new Audio('dark.mp3');
             bgMusic.loop = true;
             bgMusic.volume = 0.4; // Müziğin de çok patlamaması için %40 seviyesine aldık
+            bgMusic.muted = isMuted;
             bgMusic.play().catch(e => console.log('Müzik otomatik başlatılamadı:', e));
 
         } catch (e) {
@@ -169,7 +174,7 @@
     }
 
     function playDropSound() {
-        if (!audioCtx) return;
+        if (!audioCtx || isMuted) return;
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
         osc.connect(gain);
@@ -184,7 +189,7 @@
     }
 
     function playMergeSound(levelIndex) {
-        if (!audioCtx) return;
+        if (!audioCtx || isMuted) return;
         const baseFreq = 250 + levelIndex * 60;
         // Ana ton
         const osc1 = audioCtx.createOscillator();
@@ -213,7 +218,7 @@
     }
 
     function playComboSound(combo) {
-        if (!audioCtx) return;
+        if (!audioCtx || isMuted) return;
         const freq = 400 + combo * 80;
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
@@ -229,7 +234,7 @@
     }
 
     function playGameOverSound() {
-        if (!audioCtx) return;
+        if (!audioCtx || isMuted) return;
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
         osc.connect(gain);
@@ -328,44 +333,50 @@
     function createBasketWalls() {
         const wallOptions = {
             isStatic: true,
-            friction: 0.4,
-            restitution: 0.15,
+            friction: 0.1,     // Duvar sürtünmesi düşürüldü ki toplar yapışmasın
+            restitution: 0.05, // Kenarlardan sekme iyileştirildi, neredeyse tamamen alındı
             render: { visible: false },
             label: 'wall'
         };
 
-        // Sol eğimli duvar - açı hesabı ile rectangle
-        const leftDx = basketBottomLeft - basketTopLeft;
-        const leftDy = (basketBottomY + 30) - (basketTopY - 50);
-        const leftLen = Math.sqrt(leftDx * leftDx + leftDy * leftDy);
-        const leftAngle = Math.atan2(leftDy, leftDx) - Math.PI / 2;
-        const leftCx = (basketTopLeft + basketBottomLeft) / 2;
-        const leftCy = ((basketTopY - 50) + (basketBottomY + 30)) / 2;
-        const leftWall = Bodies.rectangle(leftCx, leftCy, BASKET_WALL_THICKNESS, leftLen, {
-            ...wallOptions,
-            angle: leftAngle
-        });
+        const th = 80;      // Tünellemeyi ve köşelerden düşmeyi önlemek için kalın duvar.
+        const overlap = 60; // Köşe birleşimlerindeki açıkları kapatmak için uzatma
 
-        // Sağ eğimli duvar - açı hesabı ile rectangle
-        const rightDx = basketBottomRight - basketTopRight;
-        const rightDy = (basketBottomY + 30) - (basketTopY - 50);
-        const rightLen = Math.sqrt(rightDx * rightDx + rightDy * rightDy);
-        const rightAngle = Math.atan2(rightDy, rightDx) - Math.PI / 2;
-        const rightCx = (basketTopRight + basketBottomRight) / 2;
-        const rightCy = ((basketTopY - 50) + (basketBottomY + 30)) / 2;
-        const rightWall = Bodies.rectangle(rightCx, rightCy, BASKET_WALL_THICKNESS, rightLen, {
-            ...wallOptions,
-            angle: rightAngle
-        });
+        function createWall(x1, y1, x2, y2, isLeft) {
+            const dx = x2 - x1;
+            const dy = y2 - y1;
+            const len = Math.sqrt(dx*dx + dy*dy);
+            const angle = Math.atan2(dy, dx);
+            
+            // Fiziksel sınırın tam olarak görsel çizgiye (x1,y1)->(x2,y2) oturması için dışa öteleme
+            const nx = isLeft ? -dy/len : dy/len;
+            const ny = isLeft ? dx/len : -dx/len;
 
-        // Alt duvar
+            const cx = (x1 + x2)/2 + nx * (th/2);
+            const cy = (y1 + y2)/2 + ny * (th/2);
+
+            return Bodies.rectangle(cx, cy, len + overlap, th, {
+                ...wallOptions,
+                angle: angle
+            });
+        }
+
+        const leftWall = createWall(basketTopLeft, basketTopY, basketBottomLeft, basketBottomY, true);
+        const rightWall = createWall(basketTopRight, basketTopY, basketBottomRight, basketBottomY, false);
+        
+        // Alt duvar tam görsel basketBottomY çizgisine oturacak şekilde
+        const bottomLen = Math.abs(basketBottomRight - basketBottomLeft) + overlap * 2;
         const bottomWall = Bodies.rectangle(
-            canvasWidth / 2, basketBottomY + BASKET_WALL_THICKNESS / 2,
-            canvasWidth, BASKET_WALL_THICKNESS,
-            wallOptions
+            canvasWidth / 2, basketBottomY + th / 2,
+            bottomLen, th,
+            { ...wallOptions, restitution: 0.05, friction: 0.5 }
         );
 
-        Composite.add(engine.world, [leftWall, rightWall, bottomWall]);
+        // Köşelerden kaçıp düşebilecek toplara karşı tam koruma devasa daireler (chamfer efekti)
+        const cornerLeft = Bodies.circle(basketBottomLeft, basketBottomY, 15, { isStatic: true, label: 'wall', restitution: 0.05 });
+        const cornerRight = Bodies.circle(basketBottomRight, basketBottomY, 15, { isStatic: true, label: 'wall', restitution: 0.05 });
+
+        Composite.add(engine.world, [leftWall, rightWall, bottomWall, cornerLeft, cornerRight]);
     }
 
     // ---- Çarpışma Yönetimi ----
@@ -514,14 +525,14 @@
         const scaleFactor = getScaleFactor();
         const scaledRadius = level.radius * scaleFactor * 0.85;
 
-        // readme2.md parametreleri: düşük friction, yüksek restitution
+        // Sepetteki topların durma işlevini düzeltmek ve büyükleri ağır yapmak için:
         const ball = Bodies.circle(x, y, scaledRadius, {
             label: level.label,
-            restitution: 0.25,     // Zıplama azaltıldı (çok zıplıyordu)
-            friction: 0.1,         
-            frictionAir: 0.002,    // Hava direnci 1-2 tık artırıldı (0.001 -> 0.002)
-            density: 0.0015 - (levelIndex * 0.0001), // KÜÇÜK TOP OPTİMİZASYONU: Küçük toplar oransal olarak daha ağır (dens) olup, deliklere sızarlar
-            slop: 0.08,            // Yumuşak çarpışma toleransı
+            restitution: 0.1,      // Zıplama daha da azaltıldı
+            friction: 0.4,         // Sürtünme artırıldı, toplar daha kolay dursun/yerde kalsın
+            frictionAir: 0.008 - (levelIndex * 0.0005), // Hava direnci: havadan düşüşleri yavaşlıyor (büyükler biraz daha hızlı yerçekimine kapılır)
+            density: 0.001 + (levelIndex * 0.002), // KURAL: Ağırlıklarına göre oranlandı (büyüdükçe çok daha ağır)
+            slop: 0.05,            // Yumuşak çarpışma toleransı düşürüldü (daha stabil duruş)
             render: { visible: false },
             collisionFilter: { group: 0, category: 0x0001, mask: 0xFFFF }
         });
@@ -749,6 +760,30 @@
         }
     }
 
+    // ---- Render Önbellek (Optimizasyon) ----
+    const renderCache = new Map();
+
+    function getCachedGradients(r, level) {
+        if (!renderCache.has(level.label)) {
+            const shadowGrd = ctx.createRadialGradient(0, r * 0.35, r * 0.2, 0, r * 0.35, r * 1.4);
+            shadowGrd.addColorStop(0, 'rgba(0,0,0,0.18)');
+            shadowGrd.addColorStop(1, 'rgba(0,0,0,0)');
+
+            const bodyGrd = ctx.createRadialGradient(-r * 0.2, -r * 0.2, r * 0.05, 0, 0, r);
+            bodyGrd.addColorStop(0, level.gradient[0]);
+            bodyGrd.addColorStop(1, level.gradient[1]);
+
+            renderCache.set(level.label, { shadowGrd, bodyGrd, cachedR: r });
+        } else {
+            const cache = renderCache.get(level.label);
+            if (Math.abs(cache.cachedR - r) > 0.5) {
+                renderCache.delete(level.label);
+                return getCachedGradients(r, level);
+            }
+        }
+        return renderCache.get(level.label);
+    }
+
     // ---- Topları Çiz (Soft-Body Hull + Gülen Surat) ----
     function renderBalls() {
         const bodies = Composite.allBodies(engine.world);
@@ -770,13 +805,12 @@
             ctx.translate(x, y);
             ctx.rotate(angle);
 
+            const gradients = getCachedGradients(r, level);
+
             // ---- Jel Gölge ----
             ctx.beginPath();
-            const shadowGrd = ctx.createRadialGradient(0, r * 0.35, r * 0.2, 0, r * 0.35, r * 1.4);
-            shadowGrd.addColorStop(0, 'rgba(0,0,0,0.18)');
-            shadowGrd.addColorStop(1, 'rgba(0,0,0,0)');
             ctx.arc(0, r * 0.35, r * 1.4, 0, Math.PI * 2);
-            ctx.fillStyle = shadowGrd;
+            ctx.fillStyle = gradients.shadowGrd;
             ctx.fill();
 
             // ---- Hull (Dış Kabuk) - readme2: bezierCurveTo ile yumuşak eğri ----
@@ -805,10 +839,7 @@
             ctx.closePath();
 
             // readme2.md: İçini gradyan ile doldur - derinlik algısı
-            const grd = ctx.createRadialGradient(-r * 0.2, -r * 0.2, r * 0.05, 0, 0, r);
-            grd.addColorStop(0, level.gradient[0]);
-            grd.addColorStop(1, level.gradient[1]);
-            ctx.fillStyle = grd;
+            ctx.fillStyle = gradients.bodyGrd;
             ctx.fill();
 
             // Soft glow kenar
@@ -1275,6 +1306,24 @@
 
         window.addEventListener('resize', handleResize);
         canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+        if (muteBtn) {
+            muteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                isMuted = !isMuted;
+                if (bgMusic) bgMusic.muted = isMuted;
+                
+                if (isMuted) {
+                    iconSoundOn.classList.add('hidden');
+                    iconSoundOff.classList.remove('hidden');
+                } else {
+                    iconSoundOn.classList.remove('hidden');
+                    iconSoundOff.classList.add('hidden');
+                    initAudio(); // Initialize audio if it was not done yet
+                }
+            });
+        }
     }
 
     function getCanvasPos(e) {

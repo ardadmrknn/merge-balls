@@ -160,6 +160,36 @@ body::after {
     height: 100%;
 }
 
+/* Optional overlay for mute button */
+#mute-btn {
+    position: absolute;
+    top: 10px;
+    right: 85px; /* Sola kaydırıldı, panelin üstüne binmemesi için */
+    width: 36px;
+    height: 36px;
+    background: rgba(30, 30, 50, 0.7);
+    border: 1px solid var(--border-glass);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--gold);
+    cursor: pointer;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 50;
+    transition: transform 0.2s, background 0.2s;
+}
+
+#mute-btn:active {
+    transform: scale(0.9);
+}
+
+#mute-btn svg {
+    width: 20px;
+    height: 20px;
+}
+
 /* ==========================================
    EVOLUTION BAR
    ========================================== */
