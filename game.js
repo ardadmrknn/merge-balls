@@ -200,7 +200,7 @@
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             
             // Arka plan müziğini (dark.mp3) başlat
-            bgMusic = new Audio('dark.mp3');
+            bgMusic = new Audio('Neon Canyon Void.mp3');
             bgMusic.loop = true;
             bgMusic.volume = 0.4; // Müziğin de çok patlamaması için %40 seviyesine aldık
             bgMusic.muted = isMuted;
@@ -389,10 +389,11 @@
             label: 'wall'
         };
 
-        const th = 80;      // Tünellemeyi ve köşelerden düşmeyi önlemek için kalın duvar.
-        const overlap = 60; // Köşe birleşimlerindeki açıkları kapatmak için uzatma
+        const th = 80;                // Tünelleme önleme için kalın duvar
+        const sideOverlap = 10;       // Yan duvarlar: az uzatma → toplar ağızdan taşabilsin
+        const bottomOverlap = 60;     // Alt/köşe: tam koruma (toplar alttan kaçmasın)
 
-        function createWall(x1, y1, x2, y2, isLeft) {
+        function createWall(x1, y1, x2, y2, isLeft, wallOverlap) {
             const dx = x2 - x1;
             const dy = y2 - y1;
             const len = Math.sqrt(dx*dx + dy*dy);
@@ -402,27 +403,30 @@
             const nx = isLeft ? -dy/len : dy/len;
             const ny = isLeft ? dx/len : -dx/len;
 
-            const cx = (x1 + x2)/2 + nx * (th/2);
-            const cy = (y1 + y2)/2 + ny * (th/2);
+            // Duvarı aşağı doğru kaydır (üste taşmaması, alta taşması için)
+            // sideOverlap küçük olduğunda duvar ağız seviyesinde biter, alt tarafta uzar
+            const shiftDown = wallOverlap * 0.4; // Aşağı yönde ofset
+            const cx = (x1 + x2)/2 + nx * (th/2) + (dx/len) * shiftDown;
+            const cy = (y1 + y2)/2 + ny * (th/2) + (dy/len) * shiftDown;
 
-            return Bodies.rectangle(cx, cy, len + overlap, th, {
+            return Bodies.rectangle(cx, cy, len + wallOverlap, th, {
                 ...wallOptions,
                 angle: angle
             });
         }
 
-        const leftWall = createWall(basketTopLeft, basketTopY, basketBottomLeft, basketBottomY, true);
-        const rightWall = createWall(basketTopRight, basketTopY, basketBottomRight, basketBottomY, false);
+        const leftWall = createWall(basketTopLeft, basketTopY, basketBottomLeft, basketBottomY, true, sideOverlap);
+        const rightWall = createWall(basketTopRight, basketTopY, basketBottomRight, basketBottomY, false, sideOverlap);
         
         // Alt duvar tam görsel basketBottomY çizgisine oturacak şekilde
-        const bottomLen = Math.abs(basketBottomRight - basketBottomLeft) + overlap * 2;
+        const bottomLen = Math.abs(basketBottomRight - basketBottomLeft) + bottomOverlap * 2;
         const bottomWall = Bodies.rectangle(
             canvasWidth / 2, basketBottomY + th / 2,
             bottomLen, th,
             { ...wallOptions, restitution: 0.05, friction: 0.5 }
         );
 
-        // Köşelerden kaçıp düşebilecek toplara karşı tam koruma devasa daireler (chamfer efekti)
+        // Köşelerden kaçıp düşebilecek toplara karşı koruma daireleri
         const cornerLeft = Bodies.circle(basketBottomLeft, basketBottomY, 15, { isStatic: true, label: 'wall', restitution: 0.05 });
         const cornerRight = Bodies.circle(basketBottomRight, basketBottomY, 15, { isStatic: true, label: 'wall', restitution: 0.05 });
 
@@ -1098,7 +1102,6 @@
     function clampBallsToBasket() {
         const bodies = Composite.allBodies(engine.world);
         const MAX_VELOCITY = 18;
-        const PUSH_STRENGTH = 0.35; // Yumuşak itme kuvveti (teleportasyon yerine)
 
         for (let i = 0; i < bodies.length; i++) {
             const body = bodies[i];
@@ -1118,42 +1121,15 @@
             const y = body.position.y;
             const r = body.scaledRadius;
 
-            // Sepet alanı içindeki topları sınırla (yumuşak kuvvet ile)
+            // --- ALT DUVAR KORUMASI (toplar alttan düşmesin) ---
+            // Sadece alt sınır için sert düzeltme tutuluyor
             if (y > basketTopY) {
-                const bounds = getBasketXAtY(y);
-                const margin = r + 2;
-                const hardMargin = r; // Kesin sınır (asla geçemez)
-
-                // Sol duvar ihlali
-                const leftPen = (bounds.left + margin) - x;
-                if (leftPen > 0) {
-                    // Yumuşak itme
-                    Body.applyForce(body, body.position, { x: leftPen * PUSH_STRENGTH * body.mass * 0.01, y: 0 });
-                    // Sert sınır: tamamen dışarıysa pozisyon düzelt
-                    if (x < bounds.left + hardMargin) {
-                        Body.setPosition(body, { x: bounds.left + hardMargin, y: y });
-                    }
-                    if (body.velocity.x < -0.5) {
-                        Body.setVelocity(body, { x: body.velocity.x * 0.1, y: body.velocity.y });
-                    }
-                }
-                // Sağ duvar ihlali
-                const rightPen = x - (bounds.right - margin);
-                if (rightPen > 0) {
-                    Body.applyForce(body, body.position, { x: -rightPen * PUSH_STRENGTH * body.mass * 0.01, y: 0 });
-                    if (x > bounds.right - hardMargin) {
-                        Body.setPosition(body, { x: bounds.right - hardMargin, y: y });
-                    }
-                    if (body.velocity.x > 0.5) {
-                        Body.setVelocity(body, { x: body.velocity.x * 0.1, y: body.velocity.y });
-                    }
-                }
-                // Alt duvar ihlali
-                const bottomPen = y - (basketBottomY - margin);
+                const bottomMargin = r + 2;
+                const bottomPen = y - (basketBottomY - bottomMargin);
                 if (bottomPen > 0) {
-                    Body.applyForce(body, body.position, { x: 0, y: -bottomPen * PUSH_STRENGTH * body.mass * 0.01 });
-                    if (y > basketBottomY - hardMargin) {
-                        Body.setPosition(body, { x: x, y: basketBottomY - hardMargin });
+                    Body.applyForce(body, body.position, { x: 0, y: -bottomPen * 0.35 * body.mass * 0.01 });
+                    if (y > basketBottomY - r) {
+                        Body.setPosition(body, { x: x, y: basketBottomY - r });
                     }
                     if (body.velocity.y > 0.5) {
                         Body.setVelocity(body, { x: body.velocity.x, y: body.velocity.y * 0.05 });
@@ -1161,8 +1137,10 @@
                 }
             }
 
-            // Sepet üstündeki toplar: GÖRÜNMEZ DUVAR YOK
-            // Toplar sepet kenarını aşarsa doğal olarak düşsün (game over tetiklenir)
+            // --- YAN DUVARLAR: SERT CLAMP YOK ---
+            // Fiziksel Matter.js duvarları topları tutuyor.
+            // Eğer toplar yeterince yığılırsa, ağız üstünden taşıp düşebilirler.
+            // Buraya sert düzeltme KOYMUYORUZ → düşme (game over) mümkün.
         }
     }
 
