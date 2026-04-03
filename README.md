@@ -47,14 +47,14 @@ Başarılı birleştirmeler ve kombolar enerji kazandırır (Maks. 100). Pasif r
 
 | # | Yetenek | Enerji | Tür | Açıklama |
 |---|---------|--------|-----|----------|
-| 1 | **Deprem** | 30 | Anında | Tüm topları rastgele devasa kuvvetlerle savurur. Topların dışarı uçmaması için sepet ağzına geçici bir kalkan/kapak oluşturulur. 2.5 saniye sürer. |
-| 2 | **Joker / Evrim** | 40 | Hedefli | Seçilen herhangi bir topu bir üst seviyeye evrimleştirir. Altın parçacık efekti ve bonus skor verir. |
-| 3 | **Bölünme (Split)** | 40 | Hedefli | Seçilen topu yok edip, bir alt seviyeden 2 yeni top oluşturur. Level 0 topları doğrudan yok eder. Alanı boşaltmak için idealdir. |
-| 4 | **Zaman Dondurma** | 25 | Anında | Sepetteki tüm mevcut topları 5 saniye boyunca yerinde dondurur. Bu sürede yeni toplar bırakılabilir ve dondurulmuş toplara çarpıp birleşebilir. Buz halka efekti gösterilir. |
-| 5 | **Kaos Topu** | 40 | Anında | Sepete "?" işaretli mor gezici bir top bırakır. 4 saniye boyunca dokunduğu topları otomatik olarak bir üst seviyeye evrimleştirir (maks. 3 dokunma, sadece level 0-8 arası). |
-| 6 | **Zincirleme Bomba** | 30 | Hedefli | Seçilen topun aynı seviyedeki TÜM kopyalarını aynı anda patlatır. Patlama dalgası çevredeki topları iter. |
-| 7 | **Mıknatıs** | 40 | Anında | 7 saniye boyunca aynı seviyedeki topları birbirine çeken manyetik kuvvet alanı oluşturur. Mavi kesikli çizgilerle bağlantılar görselleştirilir. |
-| 8 | **Takas** | 30 | Hedefli (2 top) | İki topun pozisyonlarını değiştirir. İlk topa, sonra ikinci topa tıklanır. Stratejik konumlandırma için kullanılır. |
+| 1 | **Takas** | 15 | Hedefli (2 top) | İki topun pozisyonlarını değiştirir. İlk topa, sonra ikinci topa tıklanır. Stratejik konumlandırma için kullanılır. |
+| 2 | **Zaman Dondurma** | 20 | Anında | Sepetteki tüm mevcut topları 5 saniye boyunca yerinde dondurur. Bu sürede yeni toplar bırakılabilir ve dondurulmuş toplara çarpıp birleşebilir. Buz halka efekti gösterilir. |
+| 3 | **Deprem** | 25 | Anında | Tüm topları rastgele devasa kuvvetlerle savurur. Topların dışarı uçmaması için sepet ağzına geçici bir kalkan/kapak oluşturulur. 2.5 saniye sürer. |
+| 4 | **Bölünme (Split)** | 30 | Hedefli | Seçilen topu yok edip, bir alt seviyeden 2 yeni top oluşturur. Level 0 topları doğrudan yok eder. Alanı boşaltmak için idealdir. |
+| 5 | **Zincirleme Bomba** | 35 | Hedefli | Seçilen topun aynı seviyedeki TÜM kopyalarını aynı anda patlatır. Patlama dalgası çevredeki topları iter. |
+| 6 | **Joker / Evrim** | 40 | Hedefli | Seçilen herhangi bir topu bir üst seviyeye evrimleştirir. Altın parçacık efekti ve bonus skor verir. |
+| 7 | **Mıknatıs** | 45 | Anında | 7 saniye boyunca aynı seviyedeki topları birbirine çeken manyetik kuvvet alanı oluşturur. Mavi kesikli çizgilerle bağlantılar görselleştirilir. |
+| 8 | **Kaos Topu** | 50 | Anında | Sepete "?" işaretli mor gezici bir top bırakır. 4 saniye boyunca dokunduğu topları otomatik olarak bir üst seviyeye evrimleştirir (maks. 3 dokunma, sadece level 0-8 arası). |
 
 ---
 

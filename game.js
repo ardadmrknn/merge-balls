@@ -1787,7 +1787,7 @@
         const clickedBodies = Matter.Query.point(ballBodies, pos);
         if (clickedBodies.length > 0) {
             const body = clickedBodies[0];
-            const cost = parseInt(abilityBtns['bomb'].dataset.cost || '30', 10);
+            const cost = parseInt(abilityBtns['bomb'].dataset.cost || '35', 10);
             energy -= cost;
             activeAbility = null;
             updateEnergyUI();
@@ -2070,7 +2070,7 @@
             const body = clickedBodies[0];
             const lvl = body.levelIndex;
             if (lvl > 0) {
-                const cost = parseInt(abilityBtns['shrink'].dataset.cost || '40', 10);
+                const cost = parseInt(abilityBtns['shrink'].dataset.cost || '30', 10);
                 energy -= cost;
                 activeAbility = null;
                 updateEnergyUI();
@@ -2117,7 +2117,7 @@
                 });
             } else {
                 // Level 0 topu bölünemez, yok et
-                const cost = parseInt(abilityBtns['shrink'].dataset.cost || '40', 10);
+                const cost = parseInt(abilityBtns['shrink'].dataset.cost || '30', 10);
                 energy -= cost;
                 activeAbility = null;
                 updateEnergyUI();
@@ -2174,7 +2174,7 @@
                 }
 
                 // İkinci top seçildi - Takas yap
-                const cost = parseInt(abilityBtns['swap'].dataset.cost || '30', 10);
+                const cost = parseInt(abilityBtns['swap'].dataset.cost || '15', 10);
                 energy -= cost;
                 activeAbility = null;
                 updateEnergyUI();
