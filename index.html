@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="Merge Guys - Fizik tabanlı birleştirme oyunu. Topları birleştir, yüksek skoru yakala!">
+    <title>Merge Guys - Birleştirme Oyunu</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="game-wrapper">
+        <!-- Header UI -->
+        <div id="header">
+            <div id="score-section">
+                <div class="score-label" id="score-label-text">SKOR</div>
+                <div class="score-value" id="score-value">0</div>
+            </div>
+            <div id="game-title">MERGE GUYS</div>
+            <div id="highscore-section">
+                <div class="score-label" id="highscore-label-text">EN YÜKSEK</div>
+                <div class="score-value" id="highscore-value">0</div>
+            </div>
+        </div>
+
+        <!-- Game Canvas -->
+        <div id="canvas-container">
+            <canvas id="game-canvas"></canvas>
+            
+            <!-- Ses Aç/Kapat Butonu -->
+            <button id="mute-btn" title="Mute/Unmute">
+                <svg id="icon-sound-on" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                    <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                </svg>
+                <svg id="icon-sound-off" class="hidden" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                    <line x1="23" y1="9" x2="17" y2="15"></line>
+                    <line x1="17" y1="9" x2="23" y2="15"></line>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Abilities Panel -->
+        <div id="abilities-panel">
+            <div id="energy-bar-container">
+                <div id="energy-bar-fill"></div>
+                <div id="energy-text">0 / 100</div>
+            </div>
+            <div id="ability-buttons">
+                <button class="ability-btn" id="btn-earthquake" data-cost="30">
+                    <!-- Tremor/Earthquake Icon -->
+                    <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M2 12h5l2-5 4 14 3-9 2 4h4"></path>
+                    </svg>
+                    <div class="cost">30</div>
+                </button>
+                <button class="ability-btn" id="btn-wildcard" data-cost="40">
+                    <!-- Magic/Star Icon -->
+                    <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                    </svg>
+                    <div class="cost">40</div>
+                </button>
+                <button class="ability-btn" id="btn-shrink" data-cost="40">
+                    <!-- Split/Divide Icon -->
+                    <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="8" cy="16" r="5"></circle>
+                        <circle cx="16" cy="16" r="5"></circle>
+                        <path d="M12 3v6M9 6l3 3 3-3"></path>
+                    </svg>
+                    <div class="cost">40</div>
+                </button>
+                <button class="ability-btn" id="btn-slowmo" data-cost="25">
+                    <!-- Ice/Freeze Icon -->
+                    <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M19.07 4.93L4.93 19.07"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                    </svg>
+                    <div class="cost">25</div>
+                </button>
+                <button class="ability-btn" id="btn-blackhole" data-cost="40">
+                    <!-- Chaos Ball Icon -->
+                    <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="8"></circle>
+                        <path d="M10 8.5c0-1 2.5-1.5 2.5 0s-2.5 1.5-2.5 2.5c0 .5.5 1 1.2 1"></path>
+                        <circle cx="12" cy="15.5" r="0.5" fill="currentColor"></circle>
+                    </svg>
+                    <div class="cost">40</div>
+                </button>
+                <button class="ability-btn" id="btn-bomb" data-cost="30">
+                    <!-- Chain Bomb Icon -->
+                    <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="8" cy="14" r="5"></circle>
+                        <circle cx="16" cy="14" r="5"></circle>
+                        <path d="M8 9V6M16 9V6"></path>
+                        <path d="M5 4l1.5 1.5M19 4l-1.5 1.5"></path>
+                    </svg>
+                    <div class="cost">30</div>
+                </button>
+                <button class="ability-btn" id="btn-magnet" data-cost="40">
+                    <!-- Magnet Icon -->
+                    <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M6 2v6a6 6 0 0 0 12 0V2"></path>
+                        <line x1="6" y1="2" x2="6" y2="6"></line>
+                        <line x1="18" y1="2" x2="18" y2="6"></line>
+                        <rect x="3" y="2" width="6" height="4" rx="1"></rect>
+                        <rect x="15" y="2" width="6" height="4" rx="1"></rect>
+                    </svg>
+                    <div class="cost">40</div>
+                </button>
+                <button class="ability-btn" id="btn-swap" data-cost="30">
+                    <!-- Swap/Exchange Icon -->
+                    <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="17 1 21 5 17 9"></polyline>
+                        <path d="M3 11V9a4 4 0 0 1 4-4h14"></path>
+                        <polyline points="7 23 3 19 7 15"></polyline>
+                        <path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
+                    </svg>
+                    <div class="cost">30</div>
+                </button>
+            </div>
+        </div>
+
+        <!-- Evolution Bar -->
+        <div id="evolution-bar">
+            <canvas id="evo-canvas" height="44"></canvas>
+        </div>
+
+        <!-- Game Over Overlay -->
+        <div id="game-over-overlay" class="hidden">
+            <div id="game-over-card">
+                <div id="game-over-title">OYUN BİTTİ</div>
+                <div id="final-score-label">SKOR</div>
+                <div id="final-score">0</div>
+                <div id="combo-info"></div>
+                <div id="new-highscore-badge" class="hidden">YENİ REKOR!</div>
+                <button id="restart-btn">TEKRAR OYNA</button>
+            </div>
+        </div>
+
+        <!-- Start Screen -->
+        <div id="start-overlay">
+            <div id="start-card">
+                <div id="start-title">MERGE GUYS</div>
+                <div id="start-subtitle">Topları birleştir, yüksek skoru yakala!</div>
+                <button id="start-btn">OYNA</button>
+                <div id="start-instructions">
+                    <p id="instruction-text">Topları bırakmak için dokun veya tıkla</p>
+                    <p id="instruction-merge-text">Aynı toplar birleşir ve büyür!</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>
