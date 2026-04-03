@@ -103,6 +103,7 @@
     let isPointerDown = false;
     let canDrop = true;
     let dropCooldown = 500;
+    let dropCooldownTimer = 0;
     let gameOver = false;
     let gameStarted = false;
 
@@ -370,7 +371,7 @@
             positionIterations: 30,
             velocityIterations: 20,
             constraintIterations: 6,
-            enableSleeping: true
+            enableSleeping: false
         });
 
         createBasketWalls();
@@ -552,10 +553,9 @@
             label: level.label,
             restitution: 0.05,
             friction: initialFriction,         
-            frictionAir: 0.005 + (levelIndex * 0.0015), 
+            frictionAir: 0.003 + (levelIndex * 0.0008), 
             density: 0.001 + (levelIndex * 0.0006), 
             slop: 0.01,
-            sleepThreshold: 30,
             render: { visible: false },
             collisionFilter: { group: 0, category: 0x0001, mask: 0xFFFF }
         });
@@ -650,6 +650,7 @@
         Composite.add(engine.world, ball);
 
         canDrop = false;
+        dropCooldownTimer = dropCooldown / 1000; // saniyeye çevir
         currentBallLevel = nextBallLevel;
         pickNextBall();
 
@@ -661,10 +662,6 @@
         if (comboTimer <= 0) {
             comboCount = 0;
         }
-
-        setTimeout(() => {
-            canDrop = true;
-        }, dropCooldown);
     }
 
     function pickNextBall() {
@@ -1165,16 +1162,7 @@
             }
 
             // Sepet üstündeki toplar: GÖRÜNMEZ DUVAR YOK
-            // Toplar sepet kenarını aşarsa doğal olarak düşsün
-            // Sadece ekran dışına çıkmayı engelle (çok aşırı durumlar için)
-            if (y <= basketTopY) {
-                if (x < -r * 2) {
-                    Body.setPosition(body, { x: -r * 2, y: y });
-                }
-                if (x > canvasWidth + r * 2) {
-                    Body.setPosition(body, { x: canvasWidth + r * 2, y: y });
-                }
-            }
+            // Toplar sepet kenarını aşarsa doğal olarak düşsün (game over tetiklenir)
         }
     }
 
@@ -1241,6 +1229,86 @@
         }
     }
 
+    // ---- Havada Takılan Topları Uyandırma ----
+    // Topların serbest düşüş yapması gerekirken takılıp kalmasını önler.
+    // enableSleeping=false olsa bile Matter.js bazı durumlarda topları
+    // hareketsiz bırakabiliyor (overlap resolution, velocity sıfırlama vb.)
+    function wakeStuckBalls() {
+        const bodies = Composite.allBodies(engine.world);
+        const now = Date.now();
+
+        for (let i = 0; i < bodies.length; i++) {
+            const body = bodies[i];
+            if (!body.label.startsWith('level')) continue;
+            if (body.isStatic) continue;
+
+            // Yeni spawn olan toplara dokunma
+            if (now - body.spawnTime < 800) continue;
+
+            const vx = body.velocity.x;
+            const vy = body.velocity.y;
+            const speed = Math.sqrt(vx * vx + vy * vy);
+
+            // Top neredeyse hareketsiz mi?
+            if (speed < 0.15) {
+                const y = body.position.y;
+                const r = body.scaledRadius;
+
+                // Top sepet tabanında veya diğer topların üstünde duruyorsa sorun yok.
+                // Ama sepet tabanından uzaktaysa (havada asılı) → uyandır
+                const distToBottom = basketBottomY - y - r;
+
+                // Sepet içindeki toplarla gerçekten temas halinde mi kontrol et
+                let isSupportedBelow = false;
+                if (distToBottom < 5) {
+                    // Tabana yakın, sorun yok
+                    isSupportedBelow = true;
+                } else {
+                    // Altında başka top veya duvar var mı?
+                    for (let j = 0; j < bodies.length; j++) {
+                        const other = bodies[j];
+                        if (other === body) continue;
+
+                        // Duvarlar için farklı destek kontrolü
+                        if (other.label === 'wall' || other.label === 'tempWall') {
+                            // Duvar yakınlığını Matter.js bounds ile kontrol et
+                            const wallBounds = other.bounds;
+                            if (wallBounds && y + r >= wallBounds.min.y - 5 && y + r <= wallBounds.max.y + 5
+                                && body.position.x >= wallBounds.min.x && body.position.x <= wallBounds.max.x) {
+                                isSupportedBelow = true;
+                                break;
+                            }
+                            continue;
+                        }
+
+                        if (!other.label.startsWith('level')) continue;
+
+                        const dx = other.position.x - body.position.x;
+                        const dy = other.position.y - body.position.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        const otherR = other.scaledRadius || 0;
+                        const touchDist = r + otherR + 5;
+
+                        // Altında mı (dy > 0 = other daha aşağıda)?
+                        if (dy > 0 && dist < touchDist) {
+                            isSupportedBelow = true;
+                            break;
+                        }
+                    }
+                }
+
+                // Havada asılı kalmış → hafif aşağı impulse ver
+                if (!isSupportedBelow) {
+                    Body.setVelocity(body, { x: vx, y: Math.max(vy, 0.5) });
+                    // Uyku modundan çıkar (enableSleeping açıksa)
+                    if (body.isSleeping) {
+                        Matter.Sleeping.set(body, false);
+                    }
+                }
+            }
+        }
+    }
+
     // ---- Sepetten Düşme Kontrolü (Game Over) ----
     // Toplar sepetin kenarlarından düşerse game over tetiklenir.
     function checkOverflow() {
@@ -1256,21 +1324,27 @@
             if (!body.label.startsWith('level')) continue;
             if (body.isStatic) continue;
 
-            // Yeni spawn olan toplara 2 saniye tolerans
-            if (now - body.spawnTime < 2000) continue;
+            // Yeni spawn olan toplara 2.5 saniye tolerans (düşüş + yerleşme süresi)
+            if (now - body.spawnTime < 2500) continue;
 
             const x = body.position.x;
             const y = body.position.y;
             const r = body.scaledRadius;
 
-            // Top ekranın altından veya sepet altından düştüyse → Game Over
-            if (y > canvasHeight + r * 3 || y > basketBottomY + r * 3) {
+            // Top sepet altından düştüyse → Game Over
+            if (y > basketBottomY + r + 20) {
+                triggerGameOver();
+                return;
+            }
+
+            // Top ekranın altından düştüyse → Game Over
+            if (y > canvasHeight + r) {
                 triggerGameOver();
                 return;
             }
 
             // Top tamamen ekran dışına çıktıysa (sol/sağ) → Game Over
-            if (x < -r * 4 || x > canvasWidth + r * 4) {
+            if (x < -r * 2 || x > canvasWidth + r * 2) {
                 triggerGameOver();
                 return;
             }
@@ -1283,6 +1357,18 @@
     function triggerGameOver() {
         gameOver = true;
         gameStarted = false;
+
+        // Aktif yetenekleri ve state'leri temizle
+        activeAbility = null;
+        swapFirstBody = null;
+        dropCooldownTimer = 0;
+        canDrop = true;
+
+        // Donmuş topları çöz (yoksa static kalırlar)
+        if (slowMoTimer > 0) {
+            slowMoTimer = 0;
+            unfreezeBalls();
+        }
 
         finalScoreEl.textContent = score;
         if (maxCombo > 1) {
@@ -1303,11 +1389,15 @@
         playGameOverSound();
         vibrate([50, 30, 100]);
 
+        updateEnergyUI();
         gameOverOverlay.classList.remove('hidden');
     }
 
     // ---- Oyun Yeniden Başlatma ----
     function restartGame() {
+        // Eski engine'deki event listener'ları temizle (duplicate birikimini önle)
+        Events.off(engine, 'collisionStart', handleCollisions);
+
         Composite.clear(engine.world);
         Engine.clear(engine);
 
@@ -1324,6 +1414,7 @@
         magnetTimer = 0;
         energyRegenAccum = 0;
         swapFirstBody = null;
+        dropCooldownTimer = 0;
         engine.timing.timeScale = 1;
         updateEnergyUI();
         gameOver = false;
@@ -1337,13 +1428,15 @@
         comboTimer = 0;
         maxCombo = 0;
         gameTime = 0;
-        gravityScale = 0.001;
+        gravityScale = 0.0015;
         basketWidthMultiplier = 1.0;
         basketExpanded60k = false;
         pendingBasketExpansion = false;
         renderCache.clear();
         screenShake = { x: 0, y: 0, intensity: 0 };
 
+        // Sepet geometrisini yeniden hesapla (multiplier sıfırlandığı için)
+        calculateBasket();
         setupPhysics();
 
         currentBallLevel = Math.floor(Math.random() * (MAX_SPAWN_LEVEL + 1));
@@ -2122,16 +2215,21 @@
                 activeAbility = null;
                 updateEnergyUI();
 
+                // Referansı silmeden önce kaydet
+                const destroyX = body.position.x;
+                const destroyY = body.position.y;
+                const destroyR = body.scaledRadius;
+
                 popEffects.push({
-                    x: body.position.x, y: body.position.y, radius: body.scaledRadius,
+                    x: destroyX, y: destroyY, radius: destroyR,
                     color: '#ffffff', alpha: 1, scale: 0.5, time: 0,
-                    particles: generateParticles(body.position.x, body.position.y, '#ffffff', 12)
+                    particles: generateParticles(destroyX, destroyY, '#ffffff', 12)
                 });
                 Composite.remove(engine.world, body);
                 playDropSound();
 
                 floatingTexts.push({
-                    x: body.position.x, y: body.position.y - 30, text: 'YOK EDİLDİ!', color: '#FF4757', alpha: 1, time: 0
+                    x: destroyX, y: destroyY - 30, text: 'YOK EDİLDİ!', color: '#FF4757', alpha: 1, time: 0
                 });
             }
         } else {
@@ -2155,12 +2253,25 @@
             if (!swapFirstBody) {
                 // İlk top seçildi
                 swapFirstBody = body;
-                body._swapHighlight = true;
+                swapFirstBody._swapHighlight = true;
                 floatingTexts.push({
                     x: body.position.x, y: body.position.y - body.scaledRadius - 15,
                     text: '2. TOPU SEÇ', color: '#00FFB3', alpha: 1, time: 0, big: true
                 });
             } else {
+                // İlk seçilen top hala dünyada mı kontrol et (merge/bomba ile silinmiş olabilir)
+                const worldBodyIds = new Set(Composite.allBodies(engine.world).map(b => b.id));
+                if (!worldBodyIds.has(swapFirstBody.id)) {
+                    // İlk top artık yok, iptal et
+                    swapFirstBody = null;
+                    activeAbility = null;
+                    updateEnergyUI();
+                    floatingTexts.push({
+                        x: pos.x, y: pos.y - 30, text: 'Hedef Kayboldu!', color: '#FF4757', alpha: 1, time: 0
+                    });
+                    return;
+                }
+
                 if (swapFirstBody.id === body.id) {
                     // Aynı topa tekrar tıklandı, iptal
                     delete swapFirstBody._swapHighlight;
@@ -2243,10 +2354,13 @@
 
         if (engine) {
             const bodies = Composite.allBodies(engine.world);
-            const walls = bodies.filter(b => b.label === 'wall');
+            // Hem kalıcı hem geçici duvarları temizle
+            const walls = bodies.filter(b => b.label === 'wall' || b.label === 'tempWall');
             for (const w of walls) {
                 Composite.remove(engine.world, w);
             }
+            // Geçici deprem duvarları referansını da temizle
+            earthquakeTempWalls = [];
             createBasketWalls();
         }
 
@@ -2369,11 +2483,26 @@
             gravityScale = 0.0015 + gameTime * GRAVITY_INCREASE_RATE; // 0.0015 başlangıç hızı
             engine.gravity.scale = gravityScale;
 
+            // Durağan topları uyandır — havada kalma sorununu önler
+            wakeStuckBalls();
+
+            // Drop cooldown (frame-based, restart-safe)
+            if (dropCooldownTimer > 0) {
+                dropCooldownTimer -= dt;
+                if (dropCooldownTimer <= 0) {
+                    dropCooldownTimer = 0;
+                    canDrop = true;
+                }
+            }
+
             // Alt-adımlama (sub-stepping): Büyük tek adım yerine küçük sabit adımlar
             // Bu, topların birbirine girmesini ve fizik kararsızlığını önler
             const SUB_STEPS = 4;
             const stepMs = (dt * 1000) / SUB_STEPS;
             for (let step = 0; step < SUB_STEPS; step++) {
+                // Her sub-step arasında merged set'i temizle (aynı frame'de farklı
+                // sub-step'lerde yeni collision'lar doğru algılansın)
+                mergedThisFrame.clear();
                 Engine.update(engine, stepMs);
             }
             clampBallsToBasket();
