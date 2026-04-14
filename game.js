@@ -200,7 +200,7 @@
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             
             // Arka plan müziğini (dark.mp3) başlat
-            bgMusic = new Audio('Neon Canyon Void.mp3');
+            bgMusic = new Audio('müzik_1.mp3');
             bgMusic.loop = true;
             bgMusic.volume = 0.4; // Müziğin de çok patlamaması için %40 seviyesine aldık
             bgMusic.muted = isMuted;
