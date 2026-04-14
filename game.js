@@ -1302,6 +1302,9 @@
             if (!body.label.startsWith('level')) continue;
             if (body.isStatic) continue;
 
+            // Kaos topu overflow kontrolüne dahil edilmemeli
+            if (body._isChaos) continue;
+
             // Yeni spawn olan toplara 2.5 saniye tolerans (düşüş + yerleşme süresi)
             if (now - body.spawnTime < 2500) continue;
 
@@ -1346,6 +1349,25 @@
         if (slowMoTimer > 0) {
             slowMoTimer = 0;
             unfreezeBalls();
+        }
+
+        // Kaos topunu temizle
+        if (blackholeTimer > 0) {
+            blackholeTimer = 0;
+            removeChaosBall();
+        }
+
+        // Mıknatısı durdur
+        magnetTimer = 0;
+
+        // Deprem geçici duvarlarını temizle
+        if (earthquakeTimer > 0 || earthquakeTempWalls.length > 0) {
+            earthquakeTimer = 0;
+            earthquakeGracePeriod = 0;
+            if (earthquakeTempWalls.length > 0) {
+                try { Composite.remove(engine.world, earthquakeTempWalls); } catch(e) {}
+                earthquakeTempWalls = [];
+            }
         }
 
         finalScoreEl.textContent = score;
@@ -1805,6 +1827,13 @@
                 score += earnedScore;
                 scoreValueEl.textContent = score;
                 addEnergy(Math.max(1, Math.floor(earnedScore / 4)));
+
+                // 60K sepet genişleme kontrolü (kaos topu üzerinden de ulaşılabilir)
+                if (!basketExpanded60k && score >= 60000) {
+                    basketExpanded60k = true;
+                    basketWidthMultiplier = 1.08;
+                    pendingBasketExpansion = true;
+                }
                 
                 popEffects.push({
                     x: bx, y: by, radius: newBall.scaledRadius,
@@ -2682,15 +2711,25 @@
             }
             // Takas hedefleme - seçili topu vurgula
             if (activeAbility === 'swap' && swapFirstBody) {
-                ctx.save();
-                ctx.strokeStyle = '#00FFB3';
-                ctx.lineWidth = 3;
-                ctx.shadowColor = '#00FFB3';
-                ctx.shadowBlur = 12;
-                ctx.beginPath();
-                ctx.arc(swapFirstBody.position.x, swapFirstBody.position.y, swapFirstBody.scaledRadius + 6, 0, Math.PI * 2);
-                ctx.stroke();
-                ctx.restore();
+                // swapFirstBody hala dünyada mı kontrol et (merge/bomba ile silinmiş olabilir)
+                const swapInWorld = Composite.allBodies(engine.world).some(b => b.id === swapFirstBody.id);
+                if (swapInWorld) {
+                    ctx.save();
+                    ctx.strokeStyle = '#00FFB3';
+                    ctx.lineWidth = 3;
+                    ctx.shadowColor = '#00FFB3';
+                    ctx.shadowBlur = 12;
+                    ctx.beginPath();
+                    ctx.arc(swapFirstBody.position.x, swapFirstBody.position.y, swapFirstBody.scaledRadius + 6, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.restore();
+                } else {
+                    // Top artık yok, seçimi temizle
+                    delete swapFirstBody._swapHighlight;
+                    swapFirstBody = null;
+                    activeAbility = null;
+                    updateEnergyUI();
+                }
             }
         }
 
